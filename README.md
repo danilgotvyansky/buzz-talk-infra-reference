@@ -3,6 +3,9 @@ Public portfolio repository representing DevOps solutions for the pet-project Bu
 
 Review and experience knowledge is highly appreciated!
 
+[🗐](#table-of-contents) is to return to Table of contents.
+
+
 # Table of contents:
 1. [Application](#application-)
 2. [Repository structure](#repository-structure-)
@@ -22,6 +25,7 @@ Review and experience knowledge is highly appreciated!
        * [Monitoring dashboard](#monitoring-dashboard-)
      * [Container scaling with Python and Grafana](#container-scaling-with-python-and-grafana-)
      * [Continuous Integration & Continuous Delivery](#continuous-integration--continuous-delivery-)
+     * [Ensure apps on Namecheap server always run](#ensure-apps-on-namecheap-server-always-run-)
 
 ### Application [🗐](#table-of-contents)
 
@@ -52,7 +56,6 @@ ${provider}-${scale}-architecture/sources/** - source files for the Terraform an
 ```
 
 ## [GCP Minimum Architecture](gcp-min-architecture/) [🗐](#table-of-contents)
-[🗐](#table-of-contents)
 
 ![image](https://github.com/user-attachments/assets/c882704b-f691-4bf4-9a88-8a7e4e017a2f)
 
@@ -176,7 +179,7 @@ For monitoring purposes many of the components are launched as binary files on N
 
 Once I came to the GCP environment monitoring I needed to dynamically discover public ephemeral IPs of the instances.
 
-To do that I developed a [small script](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/prometheus/gcp_discover_instances.py) which updates `file_sd/gcp_instances.yml` file mentioned in [prometheus.yml](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/prometheus/prometheus.yml)
+To do that I developed a [small script](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/prometheus/gcp_discover_instances.py) which updates `file_sd/gcp_instances.yml` file mentioned in [prometheus.yml](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/prometheus/prometheus.yml). Runs on Cron
 
 The script uses service account for Prometheus described [here](gcp-min-architecture/04-monitoring/iam/serviceaccount.tf).
 
@@ -193,6 +196,8 @@ Since instances have public ephemeral IPs, developers could just visit the dashb
 **Last 24 hours screenshot of dynamic panel**
 
 ![screenshot_24h](https://github.com/user-attachments/assets/ba6c4237-6a4b-45a0-8264-e6c27482e2c7)
+
+Other screenshots can be found [there](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/grafana/dashboards/README.md)
 
 #### Container scaling with Python and Grafana [🗐](#table-of-contents)
 
@@ -242,6 +247,12 @@ The project uses GitHub actions spread to backend, frontend and infra repos to p
 * Merging pull request on backend repo triggers [ci_build-push.yaml](backend-repo-devops/.github/workflows/ci_build-push.yaml) which builds Docker image and pushes it to the GitHub Container Registry.
 * For frontend building and pushing image is triggered manually by [ci_build-push.yaml](https://github.com/lovember26/buzzTalk-chat-front-end-2/blob/dev/.github/workflows/ci_build-push.yaml) because the approach was more convenient for frontend developer. Image is pushed to GitHub Container Registry.
 * Deploy is triggered manually and performed with the help of [deploy.yaml](.github/workflows/deploy.yaml), dynamic instance public ephemeral IP discovery, SSH requests and bash scripts used both for the [instance launch automation](#instance-template-requires-shutdown-to-edit) and deploy. Deploy workflow actually just runs the bash script on the machine. Also, you are able to use both locally generated `gloud auth access token` or service account for deployment.
+
+#### Ensure apps on Namecheap server always run [🗐](#table-of-contents)
+
+To ensure all apps on Namecheap server are still working after some maintenance or shutdown, I developed a custom script which acts as a healthcheck for all processes indicated in it and restarts the app if it is not running. Runs on cron.
+
+[proc_healthcheck.py](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/proc_healthcheck/proc_healthcheck.py)
 
 </details>
 
