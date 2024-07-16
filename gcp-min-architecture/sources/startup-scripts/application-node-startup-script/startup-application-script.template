@@ -59,6 +59,7 @@ docker service create --name backend \
   -e MYSQL_DB_HOST=127.0.0.1 \
   -e DEBUG=$DECODED_DEBUG \
   -e FRONT="http://buzztalk.burava.com" \
+  --mount type=bind,source=/root/.ssh/cpanel_username,target=/buzz-talk-api/.ssh/cpanel_username \
   --network node-net \
   --restart-delay 30s \
   --restart-max-attempts 15 \
