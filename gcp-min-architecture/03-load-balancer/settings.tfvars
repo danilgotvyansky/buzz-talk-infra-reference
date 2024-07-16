@@ -1,0 +1,5 @@
+healthcheck_name     = "http-basic-healthcheck"
+backend_name         = "application-be"
+url_map_name         = "application-lb"
+http_proxy_name      = "application-lb-target-proxy"
+forwarding_rule_name = "application-traffic-fe"

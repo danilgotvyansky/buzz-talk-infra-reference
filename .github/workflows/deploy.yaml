@@ -1,0 +1,94 @@
+name: Deploy to GCP using SSH
+
+on:
+  workflow_dispatch:
+    inputs:
+      access_token:
+        description: 'GCP Access Token'
+        required: false
+      deploy_backend:
+        type: boolean
+        description: 'Deploy backend?'
+        required: true
+        default: false
+      deploy_frontend:
+        type: boolean
+        description: 'Deploy frontend?'
+        required: true
+        default: false
+
+jobs:
+  deploy_to_gcp_via_ssh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up GCP authentication
+        if: ${{ github.event.inputs.access_token == '' }}
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Fetch Instance Selflinks from Instance Group
+        id: fetch_instances
+        env:
+          ACCESS_TOKEN: ${{ github.event.inputs.access_token }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          if [ -z "${ACCESS_TOKEN}" ]; then
+            ACCESS_TOKEN=$(gcloud auth print-access-token)
+          fi
+
+          INSTANCE_RESPONSE=$(curl -d '{"instanceState": "RUNNING"}' -X POST \
+          -H "X-Goog-User-Project: $PROJECT_ID" \
+          -H "Authorization: Bearer $ACCESS_TOKEN" \
+          "https://compute.googleapis.com/compute/v1/projects/$PROJECT_ID/regions/us-central1/instanceGroups/instance-group-1/listInstances")
+
+          # Extract instance self-links
+          INSTANCE_SELF_LINKS=$(echo "$INSTANCE_RESPONSE" | jq -r '.items[].instance')
+          echo "INSTANCE_SELF_LINKS<<EOF" >> $GITHUB_ENV
+          echo "$INSTANCE_SELF_LINKS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Get Instance IPs and SSH to Check Docker
+        env:
+          ACCESS_TOKEN: ${{ github.event.inputs.access_token }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          DEPLOY_BACKEND: ${{ github.event.inputs.deploy_backend }}
+          DEPLOY_FRONTEND: ${{ github.event.inputs.deploy_frontend }}
+        run: |
+          if [ -z "${ACCESS_TOKEN}" ]; then
+            ACCESS_TOKEN=$(gcloud auth print-access-token)
+          fi
+
+          echo "Instance Self Links:"
+          echo "$INSTANCE_SELF_LINKS"
+
+          mapfile -t INSTANCE_LINKS <<< "$INSTANCE_SELF_LINKS"
+
+          for INSTANCE_LINK in "${INSTANCE_LINKS[@]}"; do
+            echo "Fetching details for link: $INSTANCE_LINK"
+            INSTANCE_DETAILS=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$INSTANCE_LINK")
+            INSTANCE_NAME=$(echo "$INSTANCE_DETAILS" | jq -r '.name')
+            PUBLIC_IP=$(echo "$INSTANCE_DETAILS" | jq -r '.networkInterfaces[0].accessConfigs[0].natIP')
+
+            echo "Attempting to connect to ${INSTANCE_NAME} at ${PUBLIC_IP}..."
+
+            chmod 0600 .ssh/deployment_key
+
+            if [ "$DEPLOY_BACKEND" == true ]; then
+              echo "Deploying backend..."
+              ssh -F .ssh/config -i .ssh/deployment_key deploy@"${PUBLIC_IP}" "sudo bash /backend.sh"
+            else
+              echo "You didn't choose to deploy backend."
+            fi
+
+            if [ "$DEPLOY_FRONTEND" == true ]; then
+              echo "Deploying frontend..."
+              ssh -F .ssh/config -i .ssh/deployment_key deploy@"${PUBLIC_IP}" "sudo bash /frontend.sh"
+            else
+              echo "You didn't choose to deploy frontend."
+            fi
+          done

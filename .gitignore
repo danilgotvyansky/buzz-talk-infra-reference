@@ -1,0 +1,30 @@
+# env files
+.env
+
+# IDE files
+*.idea
+
+# VS code files
+.vscode/*
+
+# MacOS files
+.DS_Store
+
+# Lock hcl
+*.terraform.lock.hcl
+.terragrunt-cache
+
+#  Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# bash files in startup scripts
+**/sources/startup-scripts/**/startup-application-script.bash
+
+# generated files
+gen_*
+
+*_sa_key.json

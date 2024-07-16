@@ -1,0 +1,162 @@
+#! /bin/bash
+export IN_DEPLOY=true
+echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
+apt-get update
+apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+apt-get update
+apt-get install -y docker-ce
+docker --version
+echo "Docker is installed"
+DECODED_GH_USER=$(echo "${GITHUB_USERNAME}" | base64 --decode)
+DECODED_GH_TOKEN=$(echo "${GITHUB_TOKEN}" | base64 --decode)
+TOKEN=$(curl -H "Metadata-Flavor: Google" "http://metadata/computeMetadata/v1/instance/service-accounts/default/token" | jq -r '.access_token')
+curl -H "Authorization: Bearer $TOKEN" -o /root/.ssh/cpanel_username "https://storage.googleapis.com/buzz-talk/gcp-min-architecture/02-instance/cpanel_username"
+chmod 0600 /root/.ssh/cpanel_username
+INSTANCE_IP=$(ip a show ens4 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+echo $INSTANCE_IP
+echo "Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile=/dev/null
+    IdentitiesOnly yes" > /root/.ssh/config
+chmod 0600 /root/.ssh/config
+echo /root/.ssh/config
+DECODED_DB_PORT=$(echo "${DB_PORT}" | base64 --decode)
+DECODED_DB_NAME=$(echo "${DB_NAME}" | base64 --decode)
+DECODED_DB_USER=$(echo "${DB_USER}" | base64 --decode)
+DECODED_DB_PASSWORD=$(echo "${DB_PASSWORD}" | base64 --decode)
+DECODED_DEBUG=$(echo "${DEBUG}" | base64 --decode)
+echo "$DECODED_GH_TOKEN" | docker login ghcr.io -u "$DECODED_GH_USER" --password-stdin
+
+docker swarm init
+
+docker network create --driver overlay node-net
+
+cat > backend.sh <<EOF
+#!/bin/bash
+export IN_DEPLOY=true
+
+echo "Stopping and removing backend service"
+docker service rm backend
+
+echo "Removing outdated backend image"
+docker image rm -f ghcr.io/buzz-talk/buzz-talk-backend:latest
+sleep 5
+
+echo "Logging in to GitHub container registry"
+echo "$DECODED_GH_TOKEN" | docker login ghcr.io -u "$DECODED_GH_USER" --password-stdin
+
+docker pull ghcr.io/buzz-talk/buzz-talk-backend:latest
+
+echo "Starting backend service"
+docker service create --name backend \
+  -e DB_ENGINE="django.db.backends.mysql" \
+  -e MYSQL_DB_NAME=$DECODED_DB_NAME \
+  -e MYSQL_DB_USER=$DECODED_DB_USER \
+  -e MYSQL_DB_PORT=$DECODED_DB_PORT \
+  -e MYSQL_DB_PASSWORD=$DECODED_DB_PASSWORD \
+  -e MYSQL_DB_HOST=127.0.0.1 \
+  -e DEBUG=$DECODED_DEBUG \
+  -e FRONT="http://buzztalk.burava.com" \
+  --network node-net \
+  --restart-delay 30s \
+  --restart-max-attempts 15 \
+  -p 8000:8000 \
+  --limit-cpu 0.06 \
+  --reserve-cpu 0.04 \
+  --limit-memory 256M \
+  --reserve-memory 180M \
+ghcr.io/buzz-talk/buzz-talk-backend:latest
+
+echo "Active containers: "
+docker ps
+
+export IN_DEPLOY=false
+EOF
+
+chmod +x backend.sh
+
+./backend.sh
+
+cat > frontend.sh <<EOF
+#!/bin/bash
+export IN_DEPLOY=true
+
+echo "Stopping and removing frontend service"
+docker service rm frontend
+
+echo "Removing outdated frontend image"
+docker image rm -f ghcr.io/buzz-talk/buzz-talk-frontend:latest
+sleep 5
+
+echo "Logging in to GitHub container registry"
+echo "$DECODED_GH_TOKEN" | docker login ghcr.io -u "$DECODED_GH_USER" --password-stdin
+
+docker pull ghcr.io/buzz-talk/buzz-talk-frontend:latest
+
+echo "Starting frontend service"
+docker service create --name frontend \
+  -e BACKEND_SERVICE_IP="backend" \
+  -e PUBLIC_HOST="buzztalk.burava.com" \
+  --network node-net \
+  --restart-delay 30s \
+  --restart-max-attempts 15 \
+  -p 80:80 \
+  --limit-cpu 0.025 \
+  --reserve-cpu 0.015 \
+  --limit-memory 60M \
+  --reserve-memory 30M \
+ghcr.io/buzz-talk/buzz-talk-frontend:latest
+
+echo "Active containers: "
+docker ps
+
+export IN_DEPLOY=false
+EOF
+
+chmod +x frontend.sh
+
+./frontend.sh
+
+echo "Starting exporters"
+echo "Starting node-exporter"
+docker pull prom/node-exporter
+docker service create --name node_exporter \
+  --network node-net \
+  --restart-delay 30s \
+  --restart-max-attempts 15 \
+  -p 9100:9100 \
+  --limit-cpu 0.025 \
+  --reserve-cpu 0.015 \
+  --limit-memory 60M \
+  --reserve-memory 30M \
+prom/node-exporter
+
+echo "Starting cadvisor"
+docker pull gcr.io/cadvisor/cadvisor:v0.49.1
+docker service create \
+  --name cadvisor \
+  --mode global \
+  --network node-net \
+  --mount type=bind,source=/,target=/rootfs,readonly \
+  --mount type=bind,source=/var/run,target=/var/run,readonly \
+  --mount type=bind,source=/sys,target=/sys,readonly \
+  --mount type=bind,source=/var/lib/docker,target=/var/lib/docker,readonly \
+  --mount type=bind,source=/dev/disk,target=/dev/disk,readonly \
+  --mount type=bind,source=/dev/kmsg,target=/dev/kmsg \
+  --publish 8080:8080 \
+  --constraint 'node.role == manager' \
+  --restart-delay 30s \
+  --restart-max-attempts 15 \
+  --limit-cpu 0.05 \
+  --reserve-cpu 0.02 \
+  --limit-memory 128M \
+  --reserve-memory 76M \
+  --cap-add ALL \
+  --with-registry-auth \
+  gcr.io/cadvisor/cadvisor:v0.49.1
+
+export IN_DEPLOY=false
+
+echo "I am Done!"

@@ -1,0 +1,136 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+    basic_auth:
+      username: "someuser"
+      password: "somepass"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: exporter_address
+      - target_label: instance
+        replacement: "cpanel_hostname"
+      - target_label: user
+        replacement: "cpanel_username"
+      - target_label: public_ip
+        replacement: "public_static_gcp_ip"
+      
+  - job_name: "redis_exporter"
+    static_configs:
+    - targets: ["127.0.0.1:9121"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: exporter_address
+      - target_label: instance
+        replacement: "cpanel_hostname"
+      - target_label: user
+        replacement: "cpanel_username"
+      - target_label: public_ip
+        replacement: "public_static_gcp_ip"
+      - target_label: redis_address
+        replacement: "redis_url"
+
+  - job_name: 'cpanel-exporter'
+    static_configs:
+      - targets: ['127.0.0.1:9123']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: exporter_address
+      - target_label: instance
+        replacement: "cpanel_hostname"
+      - target_label: public_ip
+        replacement: "public_static_gcp_ip"
+
+  - job_name: 'blackbox-exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['127.0.0.1:9115']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: exporter_address
+      - target_label: instance
+        replacement: "cpanel_hostname"
+      - target_label: user
+        replacement: "cpanel_username"
+      - target_label: public_ip
+        replacement: "public_static_gcp_ip"
+      
+  - job_name: 'blackbox_sites'
+    metrics_path: /probe
+    params:
+      module: [http_2xx] 
+    static_configs:
+      - targets:
+        - http://buzztalk-api.burava.com/media/
+        - http://buzztalk.burava.com/buzztalk-api/
+        - http://buzztalk.burava.com
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+
+  - job_name: blackbox_dbs
+    metrics_path: /probe
+    params:
+      module:
+        - http_2xx
+    static_configs:
+      - targets:
+          - http://127.0.0.1:5000/healthcheck/mysql?host=127.0.0.1&user=cpanel_username_db_username&password=somepassword&db=cpanel_username_db_name
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+        regex: (.*)
+        replacement: $1
+      - source_labels: [__param_target]
+        target_label: instance
+        regex: .+?host=([^&]+).*
+        replacement: $1
+      - source_labels: [__param_target]
+        target_label: db
+        regex: .+?db=([^&]+).*
+        replacement: $1
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+        
+  - job_name: 'cadvisor'
+    file_sd_configs:
+      - files:
+          - '/home/cpanel_username/prometheus/file_sd/gcp_instances.yml'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __address__
+        replacement: ${1}:8080
+      - source_labels: [__address__]
+        target_label: exporter_address
+
+  - job_name: 'node-exporter'
+    file_sd_configs:
+      - files:
+          - '/home/cpanel_username/prometheus/file_sd/gcp_instances.yml'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __address__
+        replacement: ${1}:9100
+      - source_labels: [__address__]
+        target_label: exporter_address
+        
+  - job_name: 'stackdriver'
+    static_configs:
+      - targets: ['127.0.0.1:9255']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: exporter_address
+      
+    # relabel_configs:
+    #   - source_labels: ['__address__']
+    #     target_label: 'instance'
+    #     replacement: '<exporter_host>'

@@ -1,0 +1,31 @@
+name: Build&Push | Application CI
+
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [3.x]
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Login to GitHub Container Registry
+      run: |
+        echo "${{ secrets.GIT_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+    - name: Build and Push Docker Image
+      run: |
+        docker build -t ghcr.io/buzz-talk/buzz-talk-backend:latest .
+        docker push ghcr.io/buzz-talk/buzz-talk-backend:latest
