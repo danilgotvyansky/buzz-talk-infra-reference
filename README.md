@@ -83,11 +83,11 @@ Even if we decide to keep current project for the long time, GCP offers 1 comple
 
 Compute settings can be found there [gcp-min-architecture/02-instance/instance-template.tf](gcp-min-architecture/02-instance/instance-template.tf)
 
-Shortly speaking, we one of the cheapest e2-micro instance with SPOT launch type.
+Shortly speaking, we use one of the cheapest e2-micro instance with SPOT launch type.
 
 #### Fast and consistent launch [🗐](#table-of-contents)
 
-I used Terraform and Terragrunt to make this configuration possible to launch in minutes and also easy to maintain. It also allowed me to practice my configuration on GCP sandboxes without spending money on my Google account. Beforehand, you literally only to create Cloud Storage bucket and database on Namecheap server.
+I used Terraform and Terragrunt to make this configuration possible to launch in minutes and also easy to maintain. It also allowed me to practice my configuration on GCP sandboxes without spending money on my Google account. Beforehand, you literally only create Cloud Storage bucket and database on Namecheap server.
 
 Proper structuring allowed me not to get lost in a bunch of .tf files and using Terragrunt maintained DRY configuration.
 
@@ -101,7 +101,7 @@ Since the free database PostgreSQL solution was limited by 3 concurrent database
 
 At the same time, we couldn't use CloudSQL because its one of the most expensive resources offered by GCP, and it doesn't fall to our *Cheap* logic. 
 
-I am continuously renting the cheapest Shared Server on Namecheap for my other side-projects which offers many things for its price: Email, Database, Disk, WordPress, Application hosting. We could launch our backend on the same server and we tried but we faced the same dependency issues as on the free ones. But at the same time, we decided to take advantage of the MySQL database offered by this plan since its usage is not limited.
+I am continuously renting the cheapest Shared Server on Namecheap for my other side-projects which offers many things for its low price: Email, Database, Disk, WordPress, Application hosting. We could launch our backend on the same server and we tried but we faced the same dependency issues as on the free ones. But at the same time, we decided to take advantage of the MySQL database offered by this plan since its usage is not limited.
 
 The only limitation is that the database port and host is not public, but with the SSH tunneling you can connect your outside applications with the database without any issues.
 
@@ -160,7 +160,7 @@ You can find used Redis configuration [there](gcp-min-architecture/sources/namec
 
 #### Monitoring. Grafana, Prometheus, exporters [🗐](#table-of-contents)
 
-For monitoring purposes many of the components are launched as binary files, and it consists of the following apps:
+For monitoring purposes many of the components are launched as binary files on Namecheap server, and it consists of the following apps:
 
 * Grafana - for monitoring visualizing and alerting. Alerts for all basic components are created but I will not upload them there since it is not very interesting 
 * Prometheus - for storing and collecting metrics ([prometheus.yml](gcp-min-architecture/sources/namecheap-config/home/cpanel_username/prometheus/prometheus.yml))
@@ -212,7 +212,7 @@ Once the alert rule is triggered, results of all queries and expressions are pas
 
 Also, using multiple notification policies allows us to send a message to Discord channel when the scaling is triggered. 
 
-More information about high-end Math expressions' explanation as well as their representation in Python (for better understanding) can be found [here](gcp-min-architecture/04-monitoring/grafana/scaler/settings.tfvars)
+More information about high-end Math expressions as well as their representation in Python (for better understanding) can be found [here](gcp-min-architecture/04-monitoring/grafana/scaler/settings.tfvars)
 
 Grafana configuration related to the scaling is described in Terraform. Configuration can be found [here](gcp-min-architecture/04-monitoring/grafana/scaler)
 
@@ -240,7 +240,7 @@ The project uses GitHub actions spread to backend, frontend and infra repos to p
 
 * Any pull request on backend repo triggers [ci_build-test.yaml](backend-repo-devops/.github/workflows/ci_build-test.yaml) which builds Docker image and runs unit tests.
 * Merging pull request on backend repo triggers [ci_build-push.yaml](backend-repo-devops/.github/workflows/ci_build-push.yaml) which builds Docker image and pushes it to the GitHub Container Registry.
-* For frontend building and pushing image is triggered manually by [ci_build-push.yaml](https://github.com/lovember26/buzzTalk-chat-front-end-2/blob/dev/.github/workflows/ci_build-push.yaml) because frontend developer said that this approach is more convenient for her. Image is pushed to GitHub Container Registry.
+* For frontend building and pushing image is triggered manually by [ci_build-push.yaml](https://github.com/lovember26/buzzTalk-chat-front-end-2/blob/dev/.github/workflows/ci_build-push.yaml) because the approach was more convenient for frontend developer. Image is pushed to GitHub Container Registry.
 * Deploy is triggered manually and performed with the help of [deploy.yaml](.github/workflows/deploy.yaml), dynamic instance public ephemeral IP discovery, SSH requests and bash scripts used both for the [instance launch automation](#instance-template-requires-shutdown-to-edit) and deploy. Deploy workflow actually just runs the bash script on the machine. Also, you are able to use both locally generated `gloud auth access token` or service account for deployment.
 
 </details>
