@@ -57,7 +57,7 @@ ${provider}-${scale}-architecture/sources/** - source files for the Terraform an
 
 ## [GCP Minimum Architecture](gcp-min-architecture/) [🗐](#table-of-contents)
 
-![image](https://github.com/user-attachments/assets/c882704b-f691-4bf4-9a88-8a7e4e017a2f)
+![image](https://github.com/user-attachments/assets/f2aee456-6d9c-40aa-a99b-11d999db7446)
 
 **Description**
 
